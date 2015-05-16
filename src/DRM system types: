@@ -1,0 +1,262 @@
+DRM system types:
+	Client
+	Trusted VM Client
+	Store
+	Content Server
+	Licence Server
+	Tracker
+	Financial Server
+
+All process only have one port one primitives
+
+Store is single threaded, but can deal multiple req (buffer)
+
+Must specify any assumptions
+
+Message formats XDR no wasted bytes (author)
+
+recever knows sender
+
+For part A you may assume that processes know the contact details of other processes.
+
+SEND
+	Blocking send
+	Non-blocking send
+	RPC call
+	RPC reply
+
+RECV
+	blocking receive
+	non-blocking receive
+	rpc accept
+	rpc call
+
+
+RPC_CLIENT?
+	rpc_send_call
+
+RPC_SERVER
+	rpc_recv_accept
+	rpc_send_reply
+
+
+
+client request store (only one request can exist):
+	req_query_store_catalog()
+		keyworld		String 			||
+		title			String 			||
+		author_single	String 			||
+		author_title	String String 	||
+		itemid			10 digit
+
+	req_buy_item()
+		item_id			10 digit		&&
+		credit_card		16 char
+
+
+store response to client
+	rsp_query_catalog()
+	rsp_buy_item_success()
+		media_w_cond	opaque
+	rsp_buy_item_refused()
+		status			30char
+
+
+store request to financial server
+	req_transaction()
+		price			Double			&&
+		credit_card		16 char
+
+financial server to store
+	rsp_transaction()
+		status(cfm||rej)30 char
+
+store to content server
+	req_item_data()
+		item_id			10 digit
+
+content server to store
+	rsp_item_data()
+		item_data		opaque
+
+
+
+trusted_vm_client to licence server
+	req_get_license()
+		cond 			String
+
+licence server to trusted_vm_client (first time use)
+	rsp_ret_licence()
+		licence_w_expiryString 8 digit
+
+trusted_vm_client to tracker (every time use)
+	rpt_update_msg()
+		item_id			10 digit
+		date_of_use 	8  digit
+
+
+
+catalog of store:
+	itemid			10 digit
+	itemtype		1  byte
+	authors 		Array<String> may be null
+	title 			String
+	keywords 		String
+	price 			Double
+	licenceid		10 digit
+
+
+
+
+
+
+Name Server
+	start up args
+		nameserver-ports
+			“Invalid command line arguments for NameServer\n”
+			“Cannot listen on given port number <port>\n” 
+			“Name Server waiting for incoming connections ...\n”
+	lookup()
+		“Error: Process has not registered with the Name Server\n”,
+	register()
+		Name, IP and Port, assume name is unique
+
+	rubbishdata - close connection
+
+
+Store
+	std error onle described
+	stdout whar ever
+	input
+		Stock-port the port will listen
+		stockfile-name items detail list
+
+		more than two file not exist, port clash 
+			--> Invalid command line arguments for Store\n
+
+	register(ip, port)
+		-->	Registration with NameServer failed\
+
+	lookup bank
+	lookup content
+		"process not reg"
+			--> "Bank has nor registered\n" exit
+		close conn after loop up or reg
+
+	read_stock_file()
+		10 items itemid (int) item price (float)
+
+	connect bank && content, open for lifetime
+		--> Unable to connect with Bank\n
+
+	listen()
+		--> Store unable to listen on given port\n
+		--> Store waiting for incoming connections\n
+	accept()
+
+	rsp_item_list()
+
+	req_transaction(itemid, price, ccn)
+		ok or fail
+		--> to client “transaction aborted”. Close
+
+	req_item_data(itemid)
+		itemid, itemcontent
+
+	reply_contenttoclient&& close conn
+
+
+
+
+Client
+	request id price 10 list()
+	buy_item(credit_num, item_id)
+	--if conn open then req *will be recv*
+	--conn only close if reply or self exit
+
+
+
+Bank
+	argument
+		bank-port
+		-->Invalid command line arguments for Bank\n
+
+	listening()
+		-->Bank unable to listen on given port\n
+		-->Bank waiting for incoming connections\n
+
+	register(bank, port, ip)
+		-->Bank registration to NameServer failed\n
+
+	accept_request()
+		if item-id odd
+			accept, send confirm '1'
+			print(itemid . 'ok')
+
+		else
+			reject send 0
+			print(itemid . 'not ok')
+
+	*not exit unless error above
+	*stderr only message
+
+
+Conetent
+	argument
+		contentport
+		contentfile-name
+		--> invalid command line arguments for content
+		--> content file does not exist
+
+	listen()
+		--> content unable to listen given port
+		-->Content waiting for incoming connections\n
+
+	rigister(content, port , ip)
+		-->Content registration with NameServer failed\n
+
+	read()
+		10 x (itemid, itemcontent)
+
+	accept_Request()
+		return content with id
+
+
+Client
+	argument
+		request
+			0 - a list of items will be requested from store
+			1-10 an item will be purchased from store
+			-->Invalid command line arguments\n
+
+	getipport(store)
+		-->Client unable to connect with NameServer\n
+
+	connectstore()
+		-->Client unable to connect with Store\n
+
+	request()
+		query
+		buy(itemid ccn)
+
+	outputrsp()
+		itemid-price list 
+			-->standerd output
+
+		rsp_buy
+			success
+				recv : read item id, itemprice, itemcontent
+				--> stdout item-id(price) CONTENT content
+
+			fail
+				recv : itemid "transaction aborted"
+				-->stdout itemid "transactionaborted"
+
+		exit()
+		*no output to stderr
+		*no stdoutput
+
+
+Logic
+Ack middleware
+UDP
